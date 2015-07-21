@@ -156,6 +156,16 @@ int bif_node_set_attr(bif_node_t *node, char *attr_name, char *value){
     return 0;
   }
 
+  if (strcmp(attr_name, "load") == 0 ){
+    sscanf(value, "0x%08x", &(node->load));
+    return 0;
+  }
+
+  if (strcmp(attr_name, "offset") == 0 ){
+    sscanf(value, "0x%08x", &(node->offset));
+    return 0;
+  }
+
   printf("Warning: node attribute not supported: \"%s\", skipping \n", attr_name);
   return -1;
 }

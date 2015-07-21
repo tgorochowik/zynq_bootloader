@@ -7,6 +7,8 @@ typedef struct bif_node_t {
 
   /* supported attributes */
   uint8_t bootloader; /* boolean */
+  uint32_t load;
+  uint32_t offset;
 } bif_node_t;
 
 typedef struct bif_cfg_t {

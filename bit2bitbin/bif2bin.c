@@ -36,7 +36,9 @@ int main(int argc, const char *argv[])
 
   int i;
   for (i = 0; i < cfg.nodes_num; i++) {
-    printf("Node: %s, is bootloader? %d\n", cfg.nodes[i].fname, cfg.nodes[i].bootloader);
+    printf("Node: %s\n", cfg.nodes[i].fname);
+    printf(" load:   %08x\n", cfg.nodes[i].load);
+    printf(" offset: %08x\n", cfg.nodes[i].offset);
   }
 
   deinit_bif_cfg(&cfg);
