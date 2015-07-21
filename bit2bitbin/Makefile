@@ -1,2 +1,2 @@
 all:
-	gcc bif2bin.c bif_parser.c -lpcre -o bif2bin
+	gcc bif2bin.c bif_parser.c bootrom.c -lpcre -o bif2bin

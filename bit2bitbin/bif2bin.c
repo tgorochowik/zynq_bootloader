@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "bif_parser.h"
+#include "bootrom.h"
 
 int main(int argc, const char *argv[])
 {
@@ -42,6 +43,11 @@ int main(int argc, const char *argv[])
   }
 
   deinit_bif_cfg(&cfg);
+
+  /* Write bin file */
+  bootrom_write_file("boot.bin");
+
+  printf("All done, quitting\n");
   return 0;
 }
 
