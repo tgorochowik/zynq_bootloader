@@ -49,12 +49,66 @@ int bootrom_prepare_header(bootrom_hdr_t *bootrom_hdr){
   return 0;
 }
 
+char magic_hdr_cmp[] = { 0x00, 0x09, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x00, 0x00, 0x01 };
+int bootrom_append_bitstream(const char *fname, FILE *ofile){
+  FILE *f_bit = fopen(fname, "r");
+  if (!f_bit) {
+    printf("file %s does not exist\n", fname);
+    exit(1);
+  }
+  char magic_hdr[13];
+  fread(&magic_hdr, 1, sizeof(magic_hdr), f_bit);
+  if (memcmp(&magic_hdr, &magic_hdr_cmp, 13) != 0) {
+    fclose(f_bit);
+    printf("bit file seems to be incorrect.\n");
+    exit(1);
+  }
+  while (1) {
+    char section_hdr[2];
+    fread(&section_hdr, 1, sizeof(section_hdr), f_bit);
+    if (section_hdr[1] != 0x0) {
+      fclose(f_bit);
+      printf("bit file seems to have mismatched sections.\n");
+      exit(1);
+    }
+
+    if (section_hdr[0] == 'e')
+      break;
+
+    uint8_t section_size;
+    fread(&section_size, 1, sizeof(uint8_t), f_bit);
+    char section_data[255];
+    fread(&section_data, 1, section_size, f_bit);
+
+    printf("Section '%c' size=%d : data = \"%s\"\n",
+           section_hdr[0], section_size, section_data);
+  }
+  uint32_t bit_size;
+  fread(&bit_size, 1, 3, f_bit);
+  bit_size = ((bit_size >> 16) & 0xFF) | (bit_size & 0xFF00) | ((bit_size << 16) & 0xFF0000);
+  printf("bitstream size is %u\n",bit_size);
+
+  int i;
+  char old_val[4];
+  char new_val[4];
+  for (i = 0; i < bit_size; i+=sizeof(old_val)) {
+    int read = fread(&old_val, 1, sizeof(old_val), f_bit);
+    new_val[0] = old_val[3];
+    new_val[1] = old_val[2];
+    new_val[2] = old_val[1];
+    new_val[3] = old_val[0];
+    fwrite(&new_val, 1, read, ofile);
+  }
+  fclose(f_bit);
+}
+
 int bootrom_write_file(const char *fname){
   FILE *file;
   bootrom_hdr_t bootrom_hdr;
 
   bootrom_prepare_header(&bootrom_hdr);
 
+  /* TODO add sanity check */
   file = fopen(fname, "wb");
 
   printf("Will attempt writing\n");
@@ -62,9 +116,13 @@ int bootrom_write_file(const char *fname){
   if (!fwrite(&bootrom_hdr, sizeof(bootrom_hdr_t), 1, file))
     printf("Error writing the binary file!\n");
 
-  printf("Writing the binary file succesfull.\n");
+  printf("Writing header file succesfull.\n");
+  bootrom_append_bitstream("fpga.bit", file);
+  printf("Writing bit file succesfull.\n");
 
   fclose(file);
 
   return 0;
 }
+
+
