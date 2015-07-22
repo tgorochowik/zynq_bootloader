@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include "bif_parser.h"
 #include "bootrom.h"
+#define rpt() printf("%s:%d \n", __func__, __LINE__)
 
 int main(int argc, const char *argv[])
 {
@@ -42,10 +43,26 @@ int main(int argc, const char *argv[])
     printf(" offset: %08x\n", cfg.nodes[i].offset);
   }
 
-  deinit_bif_cfg(&cfg);
+  /* Generate bin file */
+  FILE *ofile;
+  uint32_t ofile_size;
+  uint32_t *file_data;
+  file_data = malloc (sizeof *file_data * 10000000);
 
-  /* Write bin file */
-  bootrom_write_file("boot.bin");
+  ofile_size = create_boot_image(file_data, &cfg);
+  /* TODO change to argv[2] */
+  ofile = fopen("boot.bin", "wb");
+
+  if (ofile == NULL ){
+    printf("Could not open output file\n");
+  }
+
+  printf("Got %dB(=%dkB=%dMB)\n", ofile_size, ofile_size / 1024, ofile_size / 1024 / 1024);
+
+  fwrite(file_data, ofile_size, 1, ofile);
+
+  free(file_data);
+  deinit_bif_cfg(&cfg);
 
   printf("All done, quitting\n");
   return 0;
