@@ -1,2 +1,5 @@
 bif2bin
 *.bif
+*.bin
+*.bit
+*.elf
