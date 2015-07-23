@@ -9,15 +9,16 @@
 
 #define rpt() printf("%s:%d\n", __func__, __LINE__)
 
-uint32_t bootrom_calc_header_checksum(bootrom_hdr_t *bootrom_hdr){
+uint32_t bootrom_calc_checksum(uint32_t *start_addr, uint32_t *end_addr ){
   uint32_t *ptr;
   uint32_t sum;
-  int i;
 
-  ptr = (uint32_t*) &bootrom_hdr->width_detect;
+  sum = 0;
+  ptr = start_addr;
 
-  for(i = 0; i < 10; i++) {
-    sum += ptr[i];
+  while( ptr < end_addr){
+    sum += *ptr;
+    ptr++;
   }
 
   return ~sum;
@@ -41,7 +42,8 @@ int bootrom_prepare_header(bootrom_hdr_t *hdr){
   hdr->start_of_exec = 0x0;
   hdr->total_img_len = 0x0; /* Will be filled elsewhere */
   hdr->reserved_1 = BOOTROM_RESERVED_1_RL;
-  hdr->checksum = bootrom_calc_header_checksum(hdr);
+  hdr->checksum = bootrom_calc_checksum(&(hdr->width_detect),
+                                        &(hdr->width_detect)+ 10);
   memset(hdr->user_defined_1, 0x0, sizeof(hdr->user_defined_1));
   memset(hdr->reg_init, 0xFF, sizeof(hdr->reg_init));
   memset(hdr->user_defined_2, 0x0, sizeof(hdr->user_defined_2));
@@ -226,7 +228,8 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       hdr.img_len = img_size;
       hdr.total_img_len = img_size;
       /* Recalculate the checksum */
-      hdr.checksum = bootrom_calc_header_checksum(&hdr);
+      hdr.checksum = bootrom_calc_checksum(&(hdr.width_detect),
+                                           &(hdr.width_detect)+ 10);
 
       /* Update the offset */
       coff += img_size;
