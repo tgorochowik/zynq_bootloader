@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <gelf.h>
+#include <unistd.h>
 
 #include "bif_parser.h"
 #include "bootrom.h"
@@ -109,13 +112,13 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename){
   uint32_t file_header;
   struct stat cfile_stat;
   FILE *cfile;
+  Elf *elf;
+  int fd_elf;
+  size_t elf_hdr_n;
+  GElf_Phdr elf_phdr;
+  int i;
 
-  uint8_t elf_arch;
-  uint32_t elf_phoff;
-  uint32_t elf_shoff;
-  uint16_t elf_shentsize;
-
-  uint32_t total_size;
+  uint32_t total_size = 0;
 
   /* TODO sanity checks */
   stat(filename, &cfile_stat);
@@ -127,49 +130,58 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename){
 
   switch(file_header){
   case FILE_MAGIC_ELF:
-    /* Check wheter it is 32b or 64b elf */
-    fseek(cfile, 0, FILE_ELF_ARCH);
-    fread(&elf_arch, 1, sizeof(elf_arch), cfile);
+    /* init elf library */
+    if(elf_version(EV_CURRENT) == EV_NONE ){
+      printf("ELF library initialization failed\n");
+      exit(1);
+    }
 
-    /* Determine the program offset */
-    switch(elf_arch){
-      case FILE_ELF_ARCH_32:
-        /* Read the actual program offset */
-        fseek(cfile, FILE_ELF_PHOFF_32, SEEK_SET);
-        fread(&elf_phoff, 1, sizeof(uint32_t), cfile);
+    /* open file descriptor used by elf library */
+    if (( fd_elf = open(filename, O_RDONLY , 0)) < 0){
+      printf("Elf could not open file %s.", filename);
+      exit(1);
+    }
 
-        /* Read the section header table offset */
-        fseek(cfile, FILE_ELF_SHOFF_32, SEEK_SET);
-        fread(&elf_shoff, 1, sizeof(uint32_t), cfile);
-        printf("SHOFF %08x\n", elf_shoff);
-
-        /* Read the section header table size */
-        fseek(cfile, FILE_ELF_SHENTSIZE_32, SEEK_SET);
-        fread(&elf_shentsize, 1, sizeof(uint16_t), cfile);
-        printf("SHENTSIZE %08x\n", elf_shentsize);
-        break;
-      case FILE_ELF_ARCH_64:
-        printf("64b ELF architecture not supported yet.\n");
-        exit(1);
-      default:
-        printf("ELF architecture not recognized.\n");
+    /* init elf */
+    if (( elf = elf_begin(fd_elf, ELF_C_READ , NULL )) == NULL ){
+        printf("elf_begin() failed : %s.");
         exit(1);
     }
 
-    /* Go to the program */
-    fseek(cfile, elf_phoff * 4, SEEK_SET);
+    /* make sure it is an elf (despite magic byte check */
+    if(elf_kind(elf) != ELF_K_ELF ){
+        printf( "\"%s\" is not an ELF object.", filename);
+        exit(1);
+    }
 
-    /* Header table is the last section of elf file,
-     * we use its offset and its size to calculate the
-     * total length of the object inside elf.
-     *
-     * This is required to drop the useless trailing data
-     */
-    total_size = (elf_shoff + elf_shentsize - elf_phoff);
-    /* TODO verify this as it doesnt seem to work correctly */
-    /* Append the file to the image */
-    fread(addr, 1, total_size, cfile);
+    /* get elf headers count */
+    if(elf_getphdrnum(elf, &elf_hdr_n)!= 0){
+         printf("elf_getphdrnum() failed.");
+         exit(1);
+    }
 
+    /* iterate through all headers to find the executable */
+    for(i = 0; i < elf_hdr_n; i ++) {
+        if(gelf_getphdr(elf, i, &elf_phdr) != &elf_phdr){
+            printf("gelf_getphdr() failed.\n");
+            exit(1);
+        }
+
+        /* check if the current one has executable flag set */
+        if (elf_phdr.p_flags & PF_X){
+          /* this is the one - prepare file for reading */
+          fseek(cfile, elf_phdr.p_offset, SEEK_SET);
+
+          /* append the data */
+          total_size = fread(addr, 1, elf_phdr.p_filesz, cfile);
+
+          /* exit loop */
+          break;
+        }
+    }
+    /* close the elf file descriptor */
+    elf_end(elf);
+    close(fd_elf);
     break;
   case FILE_MAGIC_XILINXBIT_0:
     /* Xilinx header is 64b, check the other half */

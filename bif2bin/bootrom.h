@@ -113,18 +113,6 @@ typedef struct bootrom_img_hdr_t{
 
 /* Other file specific files */
 #define FILE_MAGIC_ELF            0x464C457F
-#define FILE_ELF_ARCH             0x05
-#define FILE_ELF_ARCH_32          0x01
-#define FILE_ELF_ARCH_64          0x02
-
-#define FILE_ELF_PHOFF_32         0x1C
-#define FILE_ELF_SHOFF_32         0x20
-#define FILE_ELF_SHENTSIZE_32     0x2E
-
-#define FILE_ELF_PHOFF_64         0x20
-#define FILE_ELF_SHOFF_64         0x28
-#define FILE_ELF_SHENTSIZE_64     0x36
-
 
 #define FILE_MAGIC_XILINXBIT_0    0xf00f0900
 #define FILE_MAGIC_XILINXBIT_1    0xf00ff00f
