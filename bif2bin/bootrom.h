@@ -40,7 +40,6 @@ typedef struct bootrom_img_hdr_tab_t{
   uint32_t part_hdr_off; /* word offset to the partition header */
   uint32_t img_hdr_off; /* word offset to first image header */
   uint32_t auth_hdr_off; /* word offset to header authentication */
-  uint32_t padding;
 } bootrom_img_hdr_tab_t;
 
 /* BootROM partition header based on ug821 */
@@ -66,14 +65,15 @@ typedef struct bootrom_partition_hdr_t{
   uint32_t checksum;
 } bootrom_partition_hdr_t;
 
+#define BOOTROM_IMG_MAX_NAME_LEN 32
+
 /* BootROM image header based on ug821 */
 typedef struct bootrom_img_hdr_t{
   uint32_t next_img_off; /* 0 if last */
   uint32_t part_hdr_off;
   uint32_t part_count; /* set to 0 */
   uint32_t name_len;
-  uint32_t name;
-  uint32_t terminator; /* set to 0 */
+  uint8_t  name[BOOTROM_IMG_MAX_NAME_LEN];
 } bootrom_img_hdr_t;
 
 /* attributes of the bootrom partition header */

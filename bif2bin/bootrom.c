@@ -218,14 +218,19 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   bif_node_t bootloader_node;
 
   uint32_t *coff = img_ptr; /* current offset/ptr */
+  uint32_t *poff; /* partition table offset */
   uint32_t img_size;
-  uint16_t i;
+  uint16_t i, j;
+  uint8_t img_name[BOOTROM_IMG_MAX_NAME_LEN];
+
+  int img_term_n = 0;
 
   /* Prepare header of the image */
   bootrom_prepare_header(&hdr);
 
-  /* move the offset to reserve the space for header */
-  coff += sizeof(hdr);
+  /* move the offset to reserve the space for headers */
+  poff = (0x000008c0)/4 + img_ptr;
+  coff = (0x00001700)/4 + img_ptr;
 
   /* Look for the bootloader */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
@@ -249,9 +254,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     }
   }
 
-  /* Finally write the header to the image */
-  memcpy(img_ptr, &(hdr), sizeof(hdr));
-
+  bootrom_img_hdr_t img_hdr[10]; /* TODO make dynamic */
   /* Iterate through the rest of images and write them */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
     /* skip bootloader this time */
@@ -261,7 +264,91 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       /* Update the offset */
       coff += img_size;
     }
+
+    /* Create image headers for all of them */
+    img_hdr[i].next_img_off = 0xAABBCCDD;
+    img_hdr[i].part_hdr_off = 0x55775577;
+    img_hdr[i].part_count = 0x0;
+    img_hdr[i].name_len = strlen(bif_cfg->nodes[i].fname);
+
+    /* Fill the name variable with zeroes */
+    for (j = 0; j < BOOTROM_IMG_MAX_NAME_LEN; j++) {
+      img_name[j] = 0x0;
+    }
+    /* Temporarily read the name */
+    memcpy(img_name, bif_cfg->nodes[i].fname, img_hdr[i].name_len);
+
+    /* Make the name len be divisible by 4 */
+    while(img_hdr[i].name_len % 4)
+      img_hdr[i].name_len++;
+
+    /* The name is packed in big-endian order. To reconstruct
+     * the string, unpack 4 bytes at a time, reverse
+     * the order, and concatenate. */
+    for (j = 0; j < img_hdr[i].name_len; j+=4) {
+      img_hdr[i].name[j+0] = img_name[j+3];
+      img_hdr[i].name[j+1] = img_name[j+2];
+      img_hdr[i].name[j+2] = img_name[j+1];
+      img_hdr[i].name[j+3] = img_name[j+0];
+    }
+
+    /* Add string terminator, the documentation says that this has
+     * to be 32b long, however the bootgen binary makes it 64b
+     * and that's what we're going to do here */
+    if ( img_hdr[i].name_len > 8 ){
+      img_term_n = 1;
+    } else {
+      img_term_n = 2;
+    }
+    memset(&(img_hdr[i].name[img_hdr[i].name_len]),
+           0x00, img_term_n * sizeof(uint32_t));
+
+    /* Fill the rest with 0xFF padding */
+    for (j = img_hdr[i].name_len + img_term_n * sizeof(uint32_t);
+         j < BOOTROM_IMG_MAX_NAME_LEN; j++) {
+      img_hdr[i].name[j] = 0xFF;
+    }
+
   }
+
+  /* Prepare image header table */
+  bootrom_img_hdr_tab_t img_hdr_tab;
+
+  img_hdr_tab.version = BOOTROM_IMG_VERSION;
+  img_hdr_tab.hdrs_count = i;
+  img_hdr_tab.part_hdr_off = 0x0; /* TODO fill */
+  img_hdr_tab.img_hdr_off = 0x0; /* TODO fill */
+  img_hdr_tab.auth_hdr_off = 0x0; /* TODO fill */
+
+  /* Copy data to the image header */
+  memcpy(poff, &(img_hdr_tab), sizeof(img_hdr_tab));
+
+  /* Add 0xFF padding */
+  uint32_t img_hdr_size = 0;
+  img_hdr_size = sizeof(img_hdr_tab) / sizeof(uint32_t);
+  while (img_hdr_size % (64 / sizeof(uint32_t))){
+    memset(poff + img_hdr_size, 0xFF, sizeof(uint32_t));
+    img_hdr_size++;
+  }
+
+  poff += img_hdr_size;
+
+  /* Copy image headers data to the image header */
+  for (i = 0; i < img_hdr_tab.hdrs_count; i++) {
+    printf("JESTEM TU: %08x\n", (poff - img_ptr)/4);
+    memcpy(poff, &(img_hdr[i]), sizeof(img_hdr[i]));
+
+    /* Add 0xFF padding */
+    img_hdr_size = sizeof(img_hdr[i]) / sizeof(uint32_t);
+    while (img_hdr_size % (64 / sizeof(uint32_t))){
+      memset(poff + img_hdr_size, 0xFF, sizeof(uint32_t));
+      img_hdr_size++;
+    }
+    poff += img_hdr_size;
+  }
+
+  /* Finally write the header to the image */
+  memcpy(img_ptr, &(hdr), sizeof(hdr));
 
   return coff - img_ptr;
 }
