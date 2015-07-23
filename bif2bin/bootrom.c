@@ -213,8 +213,6 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* move the offset to reserve the space for header */
   coff += sizeof(hdr);
 
-  /* TODO add 0xFF padding if(coff % 64) */
-
   /* Look for the bootloader */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
     if (bif_cfg->nodes[i].bootloader){
