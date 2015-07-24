@@ -59,8 +59,9 @@ int main(int argc, const char *argv[])
 
   printf("Got %dB(=%dkB=%dMB)\n", ofile_size, ofile_size / 1024, ofile_size / 1024 / 1024);
 
-  fwrite(file_data, ofile_size, 1, ofile);
+  fwrite(file_data, sizeof(uint32_t), ofile_size, ofile);
 
+  fclose(ofile);
   free(file_data);
   deinit_bif_cfg(&cfg);
 
