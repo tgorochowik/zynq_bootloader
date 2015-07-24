@@ -221,9 +221,11 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   uint32_t *coff = img_ptr; /* current offset/ptr */
   uint32_t *poff; /* current partiton offset */
   uint32_t *hoff; /* partition header table offset */
-  uint32_t img_size;
+  uint32_t img_size[BIF_MAX_NODES_NUM];
   uint16_t i, j;
   uint8_t img_name[BOOTROM_IMG_MAX_NAME_LEN];
+
+  bootrom_img_hdr_t img_hdr[BIF_MAX_NODES_NUM];
 
   int img_term_n = 0;
 
@@ -239,32 +241,31 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     if (bif_cfg->nodes[i].bootloader){
       bootloader_node = bif_cfg->nodes[i];
       /* Read the bootloader from disk */
-      img_size = append_file_to_image(coff, bootloader_node.fname);
+      img_size[i] = append_file_to_image(coff, bootloader_node.fname);
 
       /* Update the header to point at the correct bootloader */
       hdr.src_offset = (coff - img_ptr)*4;
       /* TODO check if size should be in words too (times 4?) */
-      hdr.img_len = img_size;
-      hdr.total_img_len = img_size;
+      hdr.img_len = img_size[i];
+      hdr.total_img_len = img_size[i];
       /* Recalculate the checksum */
       hdr.checksum = bootrom_calc_checksum(&(hdr.width_detect),
                                            &(hdr.reserved_1));
 
       /* Update the offset */
-      coff += img_size;
+      coff += img_size[i];
       break;
     }
   }
 
-  bootrom_img_hdr_t img_hdr[10]; /* TODO make dynamic */
   /* Iterate through the rest of images and write them */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
     /* skip bootloader this time */
     if (!bif_cfg->nodes[i].bootloader){
-      img_size = append_file_to_image(coff, bif_cfg->nodes[i].fname);
+      img_size[i] = append_file_to_image(coff, bif_cfg->nodes[i].fname);
 
       /* Update the offset */
-      coff += img_size;
+      coff += img_size[i];
     }
 
     /* Create image headers for all of them */
@@ -381,7 +382,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   memcpy(hoff, &(img_hdr_tab), sizeof(img_hdr_tab));
 
   /* Add 0xFF padding until BOOTROM_PART_HDR_OFF */
-  while ( poff - img_ptr < BOOTROM_PART_HDR_OFF / 4 ){
+  while ( poff - img_ptr < BOOTROM_PART_HDR_OFF / sizeof(uint32_t) ){
     memset(poff, 0xFF, sizeof(uint32_t));
     poff++;
   }

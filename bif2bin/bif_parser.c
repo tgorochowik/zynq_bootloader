@@ -7,7 +7,7 @@
 
 int init_bif_cfg(bif_cfg_t *cfg){
   cfg->nodes_num = 0;
-  cfg->nodes_avail = 100;
+  cfg->nodes_avail = BIF_MAX_NODES_NUM;
   /* TODO make it dynamic */
 
   return 0;
@@ -15,7 +15,7 @@ int init_bif_cfg(bif_cfg_t *cfg){
 
 int deinit_bif_cfg(bif_cfg_t *cfg){
   cfg->nodes_num = 0;
-  cfg->nodes_avail = 0;
+  cfg->nodes_avail = BIF_MAX_NODES_NUM;
   /* TODO make it dynamic */
 
   return 0;
