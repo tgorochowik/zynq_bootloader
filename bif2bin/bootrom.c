@@ -12,6 +12,7 @@
 
 #define rpt() printf("%s:%d\n", __func__, __LINE__)
 
+/* This calculates the checksum up to (and including) end_addr */
 uint32_t bootrom_calc_checksum(uint32_t *start_addr, uint32_t *end_addr ){
   uint32_t *ptr;
   uint32_t sum;
@@ -19,7 +20,7 @@ uint32_t bootrom_calc_checksum(uint32_t *start_addr, uint32_t *end_addr ){
   sum = 0;
   ptr = start_addr;
 
-  while( ptr < end_addr){
+  while( ptr <= end_addr){
     sum += *ptr;
     ptr++;
   }
@@ -246,7 +247,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       hdr.total_img_len = img_size;
       /* Recalculate the checksum */
       hdr.checksum = bootrom_calc_checksum(&(hdr.width_detect),
-                                           &(hdr.width_detect)+ 10);
+                                           &(hdr.reserved_1));
 
       /* Update the offset */
       coff += img_size;
