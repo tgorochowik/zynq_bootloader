@@ -303,8 +303,6 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     }
 
     /* Create image headers for all of them */
-    img_hdr[i].next_img_off = 0xAABBCCDD;
-    img_hdr[i].part_hdr_off = 0x55775577;
     img_hdr[i].part_count = 0x0;
 
     /* filling this field as a helper */
