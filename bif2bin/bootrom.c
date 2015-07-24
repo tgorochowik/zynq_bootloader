@@ -359,8 +359,9 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     } else {
       img_hdr[i].next_img_off = poff + img_hdr_size - img_ptr;
     }
-    img_hdr[i].part_hdr_off = (BOOTROM_PART_HDR_OFF / 4) +
-                              (i * BOOTROM_PART_HDR_INT_SIZE);
+    img_hdr[i].part_hdr_off =
+      (BOOTROM_PART_HDR_OFF / sizeof(uint32_t)) +
+      (i * sizeof(bootrom_partition_hdr_t) / sizeof(uint32_t));
 
     /* Write the actual img_hdr data */
     memcpy(poff, &(img_hdr[i]), sizeof(img_hdr[i]));

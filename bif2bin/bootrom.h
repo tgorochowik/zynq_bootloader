@@ -105,7 +105,6 @@ typedef struct bootrom_img_hdr_t{
 
 #define BOOTROM_IMG_HDR_OFF       0x000008c0
 #define BOOTROM_PART_HDR_OFF      0x00000c80
-#define BOOTROM_PART_HDR_INT_SIZE 0x10
 #define BOOTROM_BINS_OFF          0x00001700
 
 /* values from the documentation */
