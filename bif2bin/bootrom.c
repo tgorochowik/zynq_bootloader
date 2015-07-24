@@ -107,7 +107,7 @@ uint32_t append_bitstream(uint32_t *addr, FILE *bitfile){
   int i;
   char old_val[4];
   char new_val[4];
-  for (i = 0; i < bit_size; i+=sizeof(old_val)) {
+  for (i = 0; i <= bit_size; i+=sizeof(old_val)) {
     int read = fread(&old_val, 1, sizeof(old_val), bitfile);
     new_val[0] = old_val[3];
     new_val[1] = old_val[2];
