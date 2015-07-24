@@ -1,0 +1,6 @@
+  bif2bin
+
+This program was created to serve as a substitution for Xilinx bootgen
+binary, which creates a bootable .bin file for ZYNQ based platforms.
+
+Please note that it is not done yet and still under development.
