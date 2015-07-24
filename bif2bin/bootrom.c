@@ -50,7 +50,7 @@ int bootrom_prepare_header(bootrom_hdr_t *hdr){
                                         &(hdr->width_detect)+ 10);
   memset(hdr->user_defined_1, 0x0, sizeof(hdr->user_defined_1));
   memset(hdr->reg_init, 0xFF, sizeof(hdr->reg_init));
-  memset(hdr->user_defined_2, 0x0, sizeof(hdr->user_defined_2));
+  memset(hdr->user_defined_2, 0xFF, sizeof(hdr->user_defined_2));
 
   return 0;
 }
