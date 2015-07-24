@@ -223,8 +223,6 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
     memset(addr+total_size, 0xFF, sizeof(uint32_t));
   }
 
-  /* TODO take other node parameters into account */
-
   /* Close the file */
   fclose(cfile);
 
