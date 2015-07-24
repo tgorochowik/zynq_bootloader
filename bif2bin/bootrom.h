@@ -103,8 +103,13 @@ typedef struct bootrom_img_hdr_t{
 #define BOOTROM_USER_0            0x01010000 /* probably not needed */
 #define BOOTROM_RESERVED_1_RL     0x00000001 /* MUST be set to 0 but is not */
 
+/* these values are also taken from bootm.bin
+ * however these might not be the only valid
+ * option - that is, in theory they could be
+ * dynamic */
 #define BOOTROM_IMG_HDR_OFF       0x000008c0
 #define BOOTROM_PART_HDR_OFF      0x00000c80
+#define BOOTROM_PART_HDR_END_OFF  0x00000d7c
 #define BOOTROM_BINS_OFF          0x00001700
 
 /* values from the documentation */

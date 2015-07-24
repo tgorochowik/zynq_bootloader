@@ -108,8 +108,9 @@ uint32_t append_bitstream(uint32_t *addr, FILE *bitfile){
   return bit_size;
 }
 
-/* Returns appended image lenght */
-uint32_t append_file_to_image(uint32_t *addr, const char *filename){
+/* Returns appended image length and destination dev via pointer */
+uint32_t append_file_to_image(uint32_t *addr, const char *filename,
+                              uint8_t *dest_dev){
   uint32_t file_header;
   struct stat cfile_stat;
   FILE *cfile;
@@ -183,6 +184,9 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename){
     /* close the elf file descriptor */
     elf_end(elf);
     close(fd_elf);
+
+    /* set destination device */
+    *dest_dev = BOOTROM_PART_ATTR_DEST_DEV_PS;
     break;
   case FILE_MAGIC_XILINXBIT_0:
     /* Xilinx header is 64b, check the other half */
@@ -193,6 +197,9 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename){
     /* It matches, append it to the image */
     fseek(cfile, 0, SEEK_SET);
     total_size = append_bitstream(addr, cfile);
+
+    /* set destination device */
+    *dest_dev = BOOTROM_PART_ATTR_DEST_DEV_PL;
     break;
   default: /* not supported - quit */
     exit(1);
@@ -221,13 +228,18 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   uint32_t *coff = img_ptr; /* current offset/ptr */
   uint32_t *poff; /* current partiton offset */
   uint32_t *hoff; /* partition header table offset */
-  uint32_t img_size[BIF_MAX_NODES_NUM];
   uint16_t i, j;
+  int img_term_n = 0;
   uint8_t img_name[BOOTROM_IMG_MAX_NAME_LEN];
 
-  bootrom_img_hdr_t img_hdr[BIF_MAX_NODES_NUM];
 
-  int img_term_n = 0;
+  /* TODO it might be a good idea to create a struct for holding these
+   * variables */
+  uint32_t img_size[BIF_MAX_NODES_NUM];
+  uint32_t img_hdr_offs[BIF_MAX_NODES_NUM];
+  uint32_t img_offs[BIF_MAX_NODES_NUM];
+  uint8_t dest_dev[BIF_MAX_NODES_NUM];
+  bootrom_img_hdr_t img_hdr[BIF_MAX_NODES_NUM];
 
   /* Prepare header of the image */
   bootrom_prepare_header(&hdr);
@@ -241,7 +253,12 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     if (bif_cfg->nodes[i].bootloader){
       bootloader_node = bif_cfg->nodes[i];
       /* Read the bootloader from disk */
-      img_size[i] = append_file_to_image(coff, bootloader_node.fname);
+      img_size[i] = append_file_to_image(coff,
+                                         bootloader_node.fname,
+                                         &(dest_dev[i]));
+
+      /* keep the offset for future use */
+      img_offs[i] = (coff - img_ptr);
 
       /* Update the header to point at the correct bootloader */
       hdr.src_offset = (coff - img_ptr)*4;
@@ -262,7 +279,12 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   for (i = 0; i < bif_cfg->nodes_num; i++) {
     /* skip bootloader this time */
     if (!bif_cfg->nodes[i].bootloader){
-      img_size[i] = append_file_to_image(coff, bif_cfg->nodes[i].fname);
+      img_size[i] = append_file_to_image(coff,
+                                         bif_cfg->nodes[i].fname,
+                                         &(dest_dev[i]));
+
+      /* keep the offset for future use */
+      img_offs[i] = (coff - img_ptr);
 
       /* Update the offset */
       coff += img_size[i];
@@ -367,6 +389,8 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     /* Write the actual img_hdr data */
     memcpy(poff, &(img_hdr[i]), sizeof(img_hdr[i]));
 
+    /* Keep the offset for later use */
+    img_hdr_offs[i] = (poff - img_ptr);
 
     if (i == 0){
       img_hdr_tab.part_img_hdr_off = (poff - img_ptr);
@@ -383,6 +407,59 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
 
   /* Add 0xFF padding until BOOTROM_PART_HDR_OFF */
   while ( poff - img_ptr < BOOTROM_PART_HDR_OFF / sizeof(uint32_t) ){
+    memset(poff, 0xFF, sizeof(uint32_t));
+    poff++;
+  }
+
+  /* Prepare partition header tables */
+  bootrom_partition_hdr_t partition_hdr;
+  for (i = 0; i < img_hdr_tab.hdrs_count; i++) {
+    partition_hdr.pd_word_len = img_size[i]/4;
+    partition_hdr.ed_word_len = img_size[i]/4;
+    partition_hdr.total_word_len = img_size[i]/4;
+
+    /* TODO the two values below might be used by
+     * additional bif parameters */
+    partition_hdr.dest_load_addr = 0x0;
+    partition_hdr.dest_exec_addr = 0x0;
+
+    partition_hdr.data_off = img_offs[i];
+
+    /* set destination device as the only attribute */
+    partition_hdr.attributes = dest_dev[i] << BOOTROM_PART_ATTR_DEST_DEV_OFF;
+
+    /* section count seems to be always se to 1 */
+    partition_hdr.section_count = 0x1;
+
+    /* doesn't seem to be used */
+    partition_hdr.checksum_off = 0x0;
+
+    partition_hdr.img_hdr_off = img_hdr_offs[i];
+
+    /* doesn't seem to be used */
+    partition_hdr.cert_off = 0x0;
+    memset(partition_hdr.reserved, 0x00, sizeof(partition_hdr.reserved));
+
+    /* calculate the checksum */
+    partition_hdr.checksum =
+      bootrom_calc_checksum(&(partition_hdr.pd_word_len),
+                            &partition_hdr.reserved[3]);
+
+    /* Write the partition headers */
+    memcpy(poff, &(partition_hdr), sizeof(partition_hdr));
+
+    /* Partition header is aligned, so no padding needed */
+    poff += sizeof(partition_hdr) / sizeof(uint32_t);
+  }
+
+  /* Add 0x00 padding until BOOTROM_PART_HDR_END_OFF */
+  while ( poff - img_ptr < BOOTROM_PART_HDR_END_OFF / sizeof(uint32_t) ){
+    memset(poff, 0x00, sizeof(uint32_t));
+    poff++;
+  }
+
+  /* Add 0xFF padding until BOOTROM_BINS_OFF */
+  while ( poff - img_ptr < BOOTROM_BINS_OFF / sizeof(uint32_t) ){
     memset(poff, 0xFF, sizeof(uint32_t));
     poff++;
   }
