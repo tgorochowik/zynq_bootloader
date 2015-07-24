@@ -219,7 +219,8 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   bif_node_t bootloader_node;
 
   uint32_t *coff = img_ptr; /* current offset/ptr */
-  uint32_t *poff; /* partition table offset */
+  uint32_t *poff; /* current partiton offset */
+  uint32_t *hoff; /* partition header table offset */
   uint32_t img_size;
   uint16_t i, j;
   uint8_t img_name[BOOTROM_IMG_MAX_NAME_LEN];
@@ -230,8 +231,8 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   bootrom_prepare_header(&hdr);
 
   /* move the offset to reserve the space for headers */
-  poff = (0x000008c0)/4 + img_ptr;
-  coff = (0x00001700)/4 + img_ptr;
+  poff = (BOOTROM_IMG_HDR_OFF) / sizeof(uint32_t) + img_ptr;
+  coff = (BOOTROM_BINS_OFF) / sizeof(uint32_t) + img_ptr;
 
   /* Look for the bootloader */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
@@ -270,6 +271,8 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     img_hdr[i].next_img_off = 0xAABBCCDD;
     img_hdr[i].part_hdr_off = 0x55775577;
     img_hdr[i].part_count = 0x0;
+
+    /* filling this field as a helper */
     img_hdr[i].name_len = strlen(bif_cfg->nodes[i].fname);
 
     /* Fill the name variable with zeroes */
@@ -294,8 +297,9 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     }
 
     /* Add string terminator, the documentation says that this has
-     * to be 32b long, however the bootgen binary makes it 64b
-     * and that's what we're going to do here */
+     * to be 32b long, however the bootgen binary makes it 64b if
+     * the length of the name is greater than 8 and that's what
+     * we're going to do here */
     if ( img_hdr[i].name_len > 8 ){
       img_term_n = 1;
     } else {
@@ -310,6 +314,11 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       img_hdr[i].name[j] = 0xFF;
     }
 
+    /* Name length is not really the length of the name.
+     * According to the documentation it is the value of the
+     * actual partition count, however the bootgen binary
+     * always sets this field to 1. */
+    img_hdr[i].name_len = 0x1;
   }
 
   /* Prepare image header table */
@@ -317,12 +326,14 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
 
   img_hdr_tab.version = BOOTROM_IMG_VERSION;
   img_hdr_tab.hdrs_count = i;
-  img_hdr_tab.part_hdr_off = 0x0; /* TODO fill */
-  img_hdr_tab.img_hdr_off = 0x0; /* TODO fill */
-  img_hdr_tab.auth_hdr_off = 0x0; /* TODO fill */
+  img_hdr_tab.part_hdr_off = 0x0; /* filled below */
+  img_hdr_tab.part_img_hdr_off = 0x0; /* filled below */
+  img_hdr_tab.auth_hdr_off = 0x0; /* auth not implemented */
 
-  /* Copy data to the image header */
-  memcpy(poff, &(img_hdr_tab), sizeof(img_hdr_tab));
+  /* The data will be copied to the reserved space later
+   * when we know all the required offsets,
+   * save the pointer for that */
+  hoff = poff;
 
   /* Add 0xFF padding */
   uint32_t img_hdr_size = 0;
@@ -334,18 +345,44 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
 
   poff += img_hdr_size;
 
-  /* Copy image headers data to the image header */
   for (i = 0; i < img_hdr_tab.hdrs_count; i++) {
-    printf("JESTEM TU: %08x\n", (poff - img_ptr)/4);
-    memcpy(poff, &(img_hdr[i]), sizeof(img_hdr[i]));
-
-    /* Add 0xFF padding */
+    /* Write 0xFF padding first - will use offset info later */
     img_hdr_size = sizeof(img_hdr[i]) / sizeof(uint32_t);
     while (img_hdr_size % (64 / sizeof(uint32_t))){
       memset(poff + img_hdr_size, 0xFF, sizeof(uint32_t));
       img_hdr_size++;
     }
+
+    /* calculate the next img hdr offsets */
+    if (i + 1 == img_hdr_tab.hdrs_count) {
+      img_hdr[i].next_img_off = 0x0;
+    } else {
+      img_hdr[i].next_img_off = poff + img_hdr_size - img_ptr;
+    }
+    img_hdr[i].part_hdr_off = (BOOTROM_PART_HDR_OFF / 4) +
+                              (i * BOOTROM_PART_HDR_INT_SIZE);
+
+    /* Write the actual img_hdr data */
+    memcpy(poff, &(img_hdr[i]), sizeof(img_hdr[i]));
+
+
+    if (i == 0){
+      img_hdr_tab.part_img_hdr_off = (poff - img_ptr);
+    }
+
     poff += img_hdr_size;
+  }
+
+  /* Fill the partition header offset in img header */
+  img_hdr_tab.part_hdr_off = BOOTROM_PART_HDR_OFF / sizeof(uint32_t);
+
+  /* Copy the image header as all the fields should be filled by now */
+  memcpy(hoff, &(img_hdr_tab), sizeof(img_hdr_tab));
+
+  /* Add 0xFF padding until BOOTROM_PART_HDR_OFF */
+  while ( poff - img_ptr < BOOTROM_PART_HDR_OFF / 4 ){
+    memset(poff, 0xFF, sizeof(uint32_t));
+    poff++;
   }
 
   /* Finally write the header to the image */

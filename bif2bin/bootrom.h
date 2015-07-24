@@ -38,7 +38,7 @@ typedef struct bootrom_img_hdr_tab_t{
   uint32_t version;
   uint32_t hdrs_count;
   uint32_t part_hdr_off; /* word offset to the partition header */
-  uint32_t img_hdr_off; /* word offset to first image header */
+  uint32_t part_img_hdr_off; /* word offset to first image header */
   uint32_t auth_hdr_off; /* word offset to header authentication */
 } bootrom_img_hdr_tab_t;
 
@@ -71,7 +71,11 @@ typedef struct bootrom_partition_hdr_t{
 typedef struct bootrom_img_hdr_t{
   uint32_t next_img_off; /* 0 if last */
   uint32_t part_hdr_off;
-  uint32_t part_count; /* set to 0 */
+  uint32_t part_count; /* always set to 0 */
+  /* Name length is not really the length of the name.
+   * According to the documentation it is the value of the
+   * actual partition count, however the bootgen binary
+   * always sets this field to 1. */
   uint32_t name_len;
   uint8_t  name[BOOTROM_IMG_MAX_NAME_LEN];
 } bootrom_img_hdr_t;
@@ -98,6 +102,11 @@ typedef struct bootrom_img_hdr_t{
 #define BOOTROM_INT_TABLE_DEFAULT 0xEAFFFFFE
 #define BOOTROM_USER_0            0x01010000 /* probably not needed */
 #define BOOTROM_RESERVED_1_RL     0x00000001 /* MUST be set to 0 but is not */
+
+#define BOOTROM_IMG_HDR_OFF       0x000008c0
+#define BOOTROM_PART_HDR_OFF      0x00000c80
+#define BOOTROM_PART_HDR_INT_SIZE 0x10
+#define BOOTROM_BINS_OFF          0x00001700
 
 /* values from the documentation */
 #define BOOTROM_WIDTH_DETECT      0xAA995566
