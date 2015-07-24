@@ -49,7 +49,19 @@ int bootrom_prepare_header(bootrom_hdr_t *hdr){
   hdr->checksum = bootrom_calc_checksum(&(hdr->width_detect),
                                         &(hdr->width_detect)+ 10);
   memset(hdr->user_defined_1, 0x0, sizeof(hdr->user_defined_1));
-  memset(hdr->reg_init, 0xFF, sizeof(hdr->reg_init));
+
+  /* TODO Not really sure what those do */
+  hdr->user_defined_1[17] = 0x0;
+  hdr->user_defined_1[18] = 0x0;
+  hdr->user_defined_1[19] = 0x000008c0;
+  hdr->user_defined_1[20] = 0x00000c80;
+
+  /* memory acces ranges - set to full */
+  for (i = 0; i < 256; i++) {
+    hdr->reg_init[2*i]   = 0xFFFFFFFF;
+    hdr->reg_init[2*i+1] = 0x0;
+  }
+
   memset(hdr->user_defined_2, 0xFF, sizeof(hdr->user_defined_2));
 
   return 0;
