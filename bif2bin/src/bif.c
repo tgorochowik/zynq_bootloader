@@ -75,8 +75,6 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
   char *bif_cfg = malloc(sizeof *bif_cfg * (end-beg));
   memcpy(bif_cfg, beg+1, end-beg-1);
 
-  //printf("\n\nInput:\n%s\n===============\n\n", bif_cfg);
-
   /* First extract the name and the parameter group if exists */
   char *pcre_regex = "(\\[(.*)\\])?([a-zA-Z.-]+)";
   const char *pcre_err;
@@ -90,7 +88,7 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
 
   /* Attributes regex */
   pcre *re_attr;
-  char *pcre_attr_regex = "(([a-zA-Z0-9]+)=([a-zA-Z0-9]+))+";      //"(,?.*(=.*)?)+";
+  char *pcre_attr_regex = "(([a-zA-Z0-9]+)=([a-zA-Z0-9]+))+";
   re_attr = pcre_compile(pcre_attr_regex, 0, &pcre_err, &pcre_err_off, NULL);
 
   /* TODO CLEANUP CLEANUP CLEANUP */
@@ -117,9 +115,6 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
       return -1;
     }
 
-    /* print matches */
-    //printf("Filename: %.*s\n", ovec[7] - ovec[6], bif_cfg + ovec[6]);
-
     /* parse attributes */
     memcpy(cattr, bif_cfg + ovec[4], ovec[5] - ovec[4]);
     cattr[ovec[5] - ovec[4]] = '\0';
@@ -133,18 +128,13 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
     do {
       aret = pcre_exec(re_attr, NULL, cattr, strlen(cattr), isoff, 0, iovec, 30);
       if (aret < 1 && isoff == 0 && strlen(cattr) > 0){
-        //printf("attr: %s\n", cattr);
         bif_node_set_attr(&node, cattr, NULL);
         break;
       }
       int i;
       for (i = 2; i < aret; i+=3) {
-        //printf("attr: %.*s", iovec[2*i+1] - iovec[2*i], cattr + iovec[i*2]);
-
         memcpy(pattr_n, cattr + iovec[i*2], iovec[2*i+1] - iovec[2*i]);
         pattr_n[iovec[2*i+1] - iovec[2*i]] = '\0';
-
-        //printf(" equal: %.*s\n", iovec[2*(i+1)+1] - iovec[2*(i+1)], cattr + iovec[(i+1)*2]);
 
         memcpy(pattr_v, cattr + iovec[(i+1)*2], iovec[2*(i+1)+1] - iovec[2*(i+1)]);
         pattr_v[iovec[2*(i+1)+1] - iovec[2*(i+1)]] = '\0';
@@ -153,8 +143,6 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
       }
       isoff = iovec[1];
     } while (aret > 3);
-
-    //printf("\n");
 
     /* set filename of the node */
     memcpy(node.fname, bif_cfg + ovec[6], ovec[7] - ovec[6]);
