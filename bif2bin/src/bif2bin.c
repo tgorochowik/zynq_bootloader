@@ -27,7 +27,6 @@
 
 #include "bif.h"
 #include "bootrom.h"
-#define rpt() printf("%s:%d \n", __func__, __LINE__)
 
 int main(int argc, const char *argv[])
 {

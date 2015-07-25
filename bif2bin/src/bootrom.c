@@ -10,8 +10,6 @@
 #include "bif.h"
 #include "bootrom.h"
 
-#define rpt() printf("%s:%d\n", __func__, __LINE__)
-
 /* This calculates the checksum up to (and including) end_addr */
 uint32_t bootrom_calc_checksum(uint32_t *start_addr, uint32_t *end_addr ){
   uint32_t *ptr;
