@@ -1,7 +1,10 @@
 CC=gcc
-FILES=bif2bin.c bif_parser.c bootrom.c
+FILES=src/{bif2bin.c,bif.c,bootrom.c}
 CFLAGS=-lpcre -lelf
-OUTPUT=bif2bin
+TARGET=bif2bin
 
 all:
-	${CC} ${FILES} ${CFLAGS} -o ${OUTPUT}
+	${CC} ${FILES} ${CFLAGS} -o ${TARGET}
+
+clean:
+	rm ${TARGET}

@@ -1,7 +1,7 @@
 #ifndef BOOTROM_H
 #define BOOTROM_H
 
-#include "bif_parser.h"
+#include "bif.h"
 
 uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg);
 

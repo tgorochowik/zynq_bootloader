@@ -24,7 +24,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "bif_parser.h"
+
+#include "bif.h"
 #include "bootrom.h"
 #define rpt() printf("%s:%d \n", __func__, __LINE__)
 
