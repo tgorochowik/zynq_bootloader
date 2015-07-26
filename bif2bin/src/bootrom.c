@@ -140,9 +140,10 @@ uint32_t append_bitstream(uint32_t *addr, FILE *bitfile){
   return bit_size;
 }
 
-/* Returns appended image length and destination dev via pointer */
+/* Returns the offset by which the addr parameter should be moved
+ * and image length + destination device via two last arguments */
 uint32_t append_file_to_image(uint32_t *addr, const char *filename,
-                              uint8_t *dest_dev){
+                              uint32_t *img_len, uint8_t *dest_dev){
   uint32_t file_header;
   struct stat cfile_stat;
   FILE *cfile;
@@ -242,6 +243,10 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
     total_size--;
   }
 
+  /* The output image needs to use the actual value +1B
+   * for some reason */
+  *img_len = total_size + 1;
+
   /* Add 0xFF padding */
   while (total_size % (BOOTROM_IMG_PADDING_SIZE / sizeof(uint32_t))){
     total_size++;
@@ -271,6 +276,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* TODO it might be a good idea to create a struct for holding these
    * variables */
   uint32_t img_size[BIF_MAX_NODES_NUM];
+  uint32_t img_size_no_pad[BIF_MAX_NODES_NUM];
   uint32_t img_hdr_offs[BIF_MAX_NODES_NUM];
   uint32_t img_offs[BIF_MAX_NODES_NUM];
   uint8_t dest_dev[BIF_MAX_NODES_NUM];
@@ -290,16 +296,19 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       /* Read the bootloader from disk */
       img_size[i] = append_file_to_image(coff,
                                          bootloader_node.fname,
+                                         &(img_size_no_pad[i]),
                                          &(dest_dev[i]));
 
       /* keep the offset for future use */
       img_offs[i] = (coff - img_ptr);
 
       /* Update the header to point at the correct bootloader */
-      hdr.src_offset = (coff - img_ptr)*4;
-      /* TODO check if size should be in words too (times 4?) */
-      hdr.img_len = img_size[i];
-      hdr.total_img_len = img_size[i];
+      hdr.src_offset = (coff - img_ptr) * sizeof(uint32_t);
+
+      /* Image length needs to be in words not bytes */
+      hdr.img_len = img_size_no_pad[i] * sizeof(uint32_t);
+      hdr.total_img_len = hdr.img_len;
+
       /* Recalculate the checksum */
       hdr.checksum = bootrom_calc_checksum(&(hdr.width_detect),
                                            &(hdr.reserved_1));
@@ -316,6 +325,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     if (!bif_cfg->nodes[i].bootloader){
       img_size[i] = append_file_to_image(coff,
                                          bif_cfg->nodes[i].fname,
+                                         &(img_size_no_pad[i]),
                                          &(dest_dev[i]));
 
       /* keep the offset for future use */
@@ -447,9 +457,9 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* Prepare partition header tables */
   bootrom_partition_hdr_t partition_hdr;
   for (i = 0; i < img_hdr_tab.hdrs_count; i++) {
-    partition_hdr.pd_word_len = img_size[i]/4;
-    partition_hdr.ed_word_len = img_size[i]/4;
-    partition_hdr.total_word_len = img_size[i]/4;
+    partition_hdr.pd_word_len = img_size_no_pad[i];
+    partition_hdr.ed_word_len = img_size_no_pad[i];
+    partition_hdr.total_word_len = img_size_no_pad[i];
 
     /* TODO the two values below might be used by
      * additional bif parameters */
