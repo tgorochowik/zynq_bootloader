@@ -243,7 +243,7 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
   }
 
   /* Add 0xFF padding */
-  while (total_size % 32){
+  while (total_size % (64 / sizeof(uint32_t))){
     total_size++;
     memset(addr+total_size, 0xFF, sizeof(uint32_t));
   }
