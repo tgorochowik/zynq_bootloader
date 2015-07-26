@@ -243,7 +243,7 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
   }
 
   /* Add 0xFF padding */
-  while (total_size % (64 / sizeof(uint32_t))){
+  while (total_size % (BOOTROM_IMG_PADDING_SIZE / sizeof(uint32_t))){
     total_size++;
     memset(addr+total_size, 0xFF, sizeof(uint32_t));
   }
@@ -394,7 +394,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* Add 0xFF padding */
   uint32_t img_hdr_size = 0;
   img_hdr_size = sizeof(img_hdr_tab) / sizeof(uint32_t);
-  while (img_hdr_size % (64 / sizeof(uint32_t))){
+  while (img_hdr_size % (BOOTROM_IMG_PADDING_SIZE / sizeof(uint32_t))){
     memset(poff + img_hdr_size, 0xFF, sizeof(uint32_t));
     img_hdr_size++;
   }
@@ -404,7 +404,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   for (i = 0; i < img_hdr_tab.hdrs_count; i++) {
     /* Write 0xFF padding first - will use offset info later */
     img_hdr_size = sizeof(img_hdr[i]) / sizeof(uint32_t);
-    while (img_hdr_size % (64 / sizeof(uint32_t))){
+    while (img_hdr_size % (BOOTROM_IMG_PADDING_SIZE / sizeof(uint32_t))){
       memset(poff + img_hdr_size, 0xFF, sizeof(uint32_t));
       img_hdr_size++;
     }

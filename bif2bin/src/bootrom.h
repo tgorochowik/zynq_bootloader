@@ -65,7 +65,9 @@ typedef struct bootrom_partition_hdr_t{
   uint32_t checksum;
 } bootrom_partition_hdr_t;
 
+/* Output image specific parameters */
 #define BOOTROM_IMG_MAX_NAME_LEN 32
+#define BOOTROM_IMG_PADDING_SIZE 64
 
 /* BootROM image header based on ug821 */
 typedef struct bootrom_img_hdr_t{
