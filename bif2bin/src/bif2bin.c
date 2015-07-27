@@ -30,34 +30,45 @@
 
 int main(int argc, const char *argv[])
 {
-  bif_cfg_t cfg;
-  init_bif_cfg(&cfg);
-
-  /* TODO change to argv[1] */
-  parse_bif("boot.bif", &cfg);
-
-  int i;
-  for (i = 0; i < cfg.nodes_num; i++) {
-    printf("Node: %s\n", cfg.nodes[i].fname);
-    printf(" load:   %08x\n", cfg.nodes[i].load);
-    printf(" offset: %08x\n", cfg.nodes[i].offset);
-  }
-
-  /* Generate bin file */
   FILE *ofile;
   uint32_t ofile_size;
   uint32_t *file_data;
+  bif_cfg_t cfg;
+  int i;
+
+  init_bif_cfg(&cfg);
+
+  if (argc != 3) {
+    printf("Zynq .bin file generator\n");
+    printf("(c) 2013-2015 Antmicro Ltd.\n");
+    printf("Usage: bif2bin <input_bif_file> <output_bit_file>\n");
+    exit(-1);
+  }
+
+  parse_bif(argv[1], &cfg);
+
+  for (i = 0; i < cfg.nodes_num; i++) {
+    printf("Node: %s", cfg.nodes[i].fname);
+    if (cfg.nodes[i].bootloader)
+      printf(" (bootloader)\n");
+    else
+      printf("\n");
+    if (cfg.nodes[i].load)
+      printf(" load:   %08x\n", cfg.nodes[i].load);
+    if (cfg.nodes[i].offset)
+      printf(" offset: %08x\n", cfg.nodes[i].offset);
+  }
+
+  /* Generate bin file */
   file_data = malloc (sizeof *file_data * 10000000);
 
   ofile_size = create_boot_image(file_data, &cfg);
-  /* TODO change to argv[2] */
-  ofile = fopen("boot.bin", "wb");
+  ofile = fopen(argv[2], "wb");
 
   if (ofile == NULL ){
-    printf("Could not open output file\n");
+    printf("Could not open output file: %s\n", argv[2]);
+    exit(-1);
   }
-
-  printf("Got %dB(=%dkB=%dMB)\n", ofile_size, ofile_size / 1024, ofile_size / 1024 / 1024);
 
   fwrite(file_data, sizeof(uint32_t), ofile_size, ofile);
 
