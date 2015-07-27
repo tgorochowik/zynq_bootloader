@@ -141,9 +141,11 @@ uint32_t append_bitstream(uint32_t *addr, FILE *bitfile){
 }
 
 /* Returns the offset by which the addr parameter should be moved
- * and image length + destination device via two last arguments */
+ * and load_addr, image length + destination device via arguments */
+/* TODO some struct for the returned parameters? */
 uint32_t append_file_to_image(uint32_t *addr, const char *filename,
-                              uint32_t *img_len, uint8_t *dest_dev){
+                              uint32_t *load_addr, uint32_t *img_len,
+                              uint8_t *dest_dev){
   uint32_t file_header;
   struct stat cfile_stat;
   FILE *cfile;
@@ -210,6 +212,9 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
           /* append the data */
           total_size = fread(addr, 1, elf_phdr.p_filesz, cfile);
 
+          /* set the execution address */
+          *load_addr = elf_phdr.p_vaddr;
+
           /* exit loop */
           break;
         }
@@ -233,6 +238,9 @@ uint32_t append_file_to_image(uint32_t *addr, const char *filename,
 
     /* set destination device */
     *dest_dev = BOOTROM_PART_ATTR_DEST_DEV_PL;
+
+    /* no execution address for bitstream */
+    *load_addr = 0x0;
     break;
   default: /* not supported - quit */
     exit(1);
@@ -276,6 +284,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* TODO it might be a good idea to create a struct for holding these
    * variables */
   uint32_t img_size[BIF_MAX_NODES_NUM];
+  uint32_t img_load_addr[BIF_MAX_NODES_NUM];
   uint32_t img_size_no_pad[BIF_MAX_NODES_NUM];
   uint32_t img_hdr_offs[BIF_MAX_NODES_NUM];
   uint32_t img_offs[BIF_MAX_NODES_NUM];
@@ -296,6 +305,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       /* Read the bootloader from disk */
       img_size[i] = append_file_to_image(coff,
                                          bootloader_node.fname,
+                                         &(img_load_addr[i]),
                                          &(img_size_no_pad[i]),
                                          &(dest_dev[i]));
 
@@ -325,6 +335,7 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     if (!bif_cfg->nodes[i].bootloader){
       img_size[i] = append_file_to_image(coff,
                                          bif_cfg->nodes[i].fname,
+                                         &(img_load_addr[i]),
                                          &(img_size_no_pad[i]),
                                          &(dest_dev[i]));
 
@@ -465,10 +476,9 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
     partition_hdr.ed_word_len = img_size_no_pad[i];
     partition_hdr.total_word_len = img_size_no_pad[i];
 
-    /* TODO the two values below might be used by
-     * additional bif parameters */
-    partition_hdr.dest_load_addr = 0x0;
-    partition_hdr.dest_exec_addr = 0x0;
+    /* set load/execution addresses */
+    partition_hdr.dest_load_addr = img_load_addr[i];
+    partition_hdr.dest_exec_addr = img_load_addr[i];
 
     partition_hdr.data_off = img_offs[i];
 
