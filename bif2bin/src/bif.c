@@ -51,8 +51,8 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
   pcre *re;
 
   if (!(bif_file = fopen(fname, "r"))){
-    printf("Error opening file\n");
-    exit(1);
+    printf("Could not open file: %s\n", fname);
+    exit(-1);
   }
 
   /* Find file size */
@@ -83,7 +83,7 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
 
   if (re == NULL){
     printf("Could not compile regex %s:%s", pcre_regex, pcre_err);
-    exit(1);
+    exit(-1);
   }
 
   /* Attributes regex */
@@ -122,7 +122,7 @@ int parse_bif(const char* fname, bif_cfg_t *cfg){
     isoff = 0;
     if (re_attr == NULL){
       printf("Could not compile regex %s:%s", pcre_attr_regex, pcre_err);
-      exit(1);
+      exit(-1);
     }
     int aret = 0;
     do {
@@ -169,20 +169,21 @@ int bif_node_set_attr(bif_node_t *node, char *attr_name, char *value){
 
   if (strcmp(attr_name, "load") == 0 ){
     sscanf(value, "0x%08x", &(node->load));
+    printf("Warning: load attribute is not supported yet.\n");
     return 0;
   }
 
   if (strcmp(attr_name, "offset") == 0 ){
     sscanf(value, "0x%08x", &(node->offset));
+    printf("Warning: offset attribute is not supported yet.\n");
     return 0;
   }
 
-  printf("Warning: node attribute not supported: \"%s\", skipping \n", attr_name);
-  return -1;
+  printf("Error: node attribute not supported: \"%s\", quitting.\n", attr_name);
+  exit(-1);
 }
 
 int bif_cfg_add_node(bif_cfg_t *cfg, bif_node_t *node){
-
   /* TODO check node availability!! */
   cfg->nodes[cfg->nodes_num] = *node;
 

@@ -62,8 +62,7 @@ int bootrom_prepare_header(bootrom_hdr_t *hdr){
   hdr->src_offset = 0x0; /* Will be filled elsewhere */
   hdr->img_len = 0x0; /* Will be filled elsewhere */
   hdr->reserved_0 = BOOTROM_RESERVED_0;
-  /* TODO the param below must be greater than 0x0 and less than 0x30000 */
-  hdr->start_of_exec = 0x0;
+  hdr->start_of_exec = 0x0; /* Will be filled elsewhere */
   hdr->total_img_len = 0x0; /* Will be filled elsewhere */
   hdr->reserved_1 = BOOTROM_RESERVED_1_RL;
   hdr->checksum = bootrom_calc_checksum(&(hdr->width_detect),
@@ -76,7 +75,7 @@ int bootrom_prepare_header(bootrom_hdr_t *hdr){
   hdr->user_defined_1[19] = 0x000008c0;
   hdr->user_defined_1[20] = 0x00000c80;
 
-  /* memory acces ranges - set to full */
+  /* Memory acces ranges - set to full (0x0 - 0xFFFFFFFF range) */
   for (i = 0; i < 256; i++) {
     hdr->reg_init[2*i]   = 0xFFFFFFFF;
     hdr->reg_init[2*i+1] = 0x0;
@@ -141,7 +140,7 @@ uint32_t append_bitstream(uint32_t *addr, FILE *bitfile){
 }
 
 /* Returns the offset by which the addr parameter should be moved
- * and load_addr, image length + destination device via arguments */
+ * and partition header info via argument pointer */
 uint32_t append_file_to_image(uint32_t *addr,
                               const char *filename,
                               bootrom_partition_hdr_t *part_hdr){
@@ -156,51 +155,57 @@ uint32_t append_file_to_image(uint32_t *addr,
 
   uint32_t total_size = 0;
 
-  /* TODO sanity checks */
-  stat(filename, &cfile_stat);
+  if(stat(filename, &cfile_stat)) {
+    printf("Could not stat file: %s\n", filename);
+    exit(-1);
+  }
   cfile = fopen(filename, "rb");
+
+  if (cfile==NULL) {
+    printf("Could not open file: %s\n", filename);
+    exit(-1);
+  }
 
   /* Check file format */
   fread(&file_header, 1, sizeof(file_header), cfile);
-  printf("File header: %08x\n", file_header);
 
   switch(file_header){
   case FILE_MAGIC_ELF:
     /* init elf library */
     if(elf_version(EV_CURRENT) == EV_NONE ){
       printf("ELF library initialization failed\n");
-      exit(1);
+      exit(-1);
     }
 
     /* open file descriptor used by elf library */
     if (( fd_elf = open(filename, O_RDONLY , 0)) < 0){
       printf("Elf could not open file %s.", filename);
-      exit(1);
+      exit(-1);
     }
 
     /* init elf */
     if (( elf = elf_begin(fd_elf, ELF_C_READ , NULL )) == NULL ){
-        printf("elf_begin() failed : %s.");
-        exit(1);
+        printf("Elf file error\n");
+        exit(-1);
     }
 
-    /* make sure it is an elf (despite magic byte check */
+    /* make sure it is an elf (despite magic byte check) */
     if(elf_kind(elf) != ELF_K_ELF ){
         printf( "\"%s\" is not an ELF object.", filename);
-        exit(1);
+        exit(-1);
     }
 
     /* get elf headers count */
     if(elf_getphdrnum(elf, &elf_hdr_n)!= 0){
-         printf("elf_getphdrnum() failed.");
-         exit(1);
+         printf("Elf file header error.\n");
+         exit(-1);
     }
 
     /* iterate through all headers to find the executable */
     for(i = 0; i < elf_hdr_n; i ++) {
         if(gelf_getphdr(elf, i, &elf_phdr) != &elf_phdr){
-            printf("gelf_getphdr() failed.\n");
-            exit(1);
+            printf("Elf file header error.\n");
+            exit(-1);
         }
 
 
@@ -232,8 +237,10 @@ uint32_t append_file_to_image(uint32_t *addr,
   case FILE_MAGIC_XILINXBIT_0:
     /* Xilinx header is 64b, check the other half */
     fread(&file_header, 1, sizeof(file_header), cfile);
-    if (file_header != FILE_MAGIC_XILINXBIT_1)
-      exit(1); /* TODO better exit */
+    if (file_header != FILE_MAGIC_XILINXBIT_1){
+      printf("Corrupted bit file: %s\n.", filename);
+      exit(-1);
+    }
 
     /* It matches, append it to the image */
     fseek(cfile, 0, SEEK_SET);
@@ -249,6 +256,7 @@ uint32_t append_file_to_image(uint32_t *addr,
 
     break;
   default: /* not supported - quit */
+    printf("File format not recognized: %s.\n", filename);
     exit(1);
   };
 
