@@ -287,7 +287,6 @@ uint32_t append_file_to_image(uint32_t *addr,
 uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* declare variables */
   bootrom_hdr_t hdr;
-  bif_node_t bootloader_node;
 
   uint32_t *coff = img_ptr; /* current offset/ptr */
   uint32_t *poff; /* current partiton offset */
@@ -303,23 +302,21 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
   /* Prepare header of the image */
   bootrom_prepare_header(&hdr);
 
-  /* move the offset to reserve the space for headers */
+  /* Move the offset to reserve the space for headers */
   poff = (BOOTROM_IMG_HDR_OFF) / sizeof(uint32_t) + img_ptr;
   coff = (BOOTROM_BINS_OFF) / sizeof(uint32_t) + img_ptr;
 
-  /* Look for the bootloader */
+  /* Iterate through the images and write them */
   for (i = 0; i < bif_cfg->nodes_num; i++) {
+
+    /* Append file content to memory */
+    img_size = append_file_to_image(coff,
+                                    bif_cfg->nodes[i].fname,
+                                    &(part_hdr[i]));
+
+    /* Check if dealing with bootloader */
     if (bif_cfg->nodes[i].bootloader){
-      bootloader_node = bif_cfg->nodes[i];
-      /* Read the bootloader from disk */
-      img_size = append_file_to_image(coff,
-                                      bootloader_node.fname,
-                                      &(part_hdr[i]));
-
-      /* Fill the offset */
-      part_hdr[i].data_off = (coff - img_ptr);
-
-      /* Update the header to point at the correct bootloader */
+      /* If so - update the header to point at the correct bootloader */
       hdr.src_offset = (coff - img_ptr) * sizeof(uint32_t);
 
       /* Image length needs to be in words not bytes */
@@ -329,30 +326,17 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       /* Recalculate the checksum */
       hdr.checksum = bootrom_calc_checksum(&(hdr.width_detect),
                                            &(hdr.reserved_1));
-
-      /* Update the offset */
-      coff += img_size;
-      break;
     }
-  }
 
-  /* Iterate through the rest of images and write them */
-  for (i = 0; i < bif_cfg->nodes_num; i++) {
-    /* skip bootloader this time */
-    if (!bif_cfg->nodes[i].bootloader){
-      img_size = append_file_to_image(coff,
-                                      bif_cfg->nodes[i].fname,
-                                      &(part_hdr[i]));
+    /* Fill the offset */
+    part_hdr[i].data_off = (coff - img_ptr);
 
-      /* Fill the offset */
-      part_hdr[i].data_off = (coff - img_ptr);
 
-      /* Update the offset, skip padding for the last image */
-      if (i == bif_cfg->nodes_num - 1){
-        coff += part_hdr[i].pd_word_len;
-      } else {
-        coff += img_size;
-      }
+    /* Update the offset, skip padding for the last image */
+    if (i == bif_cfg->nodes_num - 1){
+      coff += part_hdr[i].pd_word_len;
+    } else {
+      coff += img_size;
     }
 
     /* Create image headers for all of them */
