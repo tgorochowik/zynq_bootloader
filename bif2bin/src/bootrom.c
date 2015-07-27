@@ -331,8 +331,12 @@ uint32_t create_boot_image(uint32_t *img_ptr, bif_cfg_t *bif_cfg){
       /* keep the offset for future use */
       img_offs[i] = (coff - img_ptr);
 
-      /* Update the offset */
-      coff += img_size[i];
+      /* Update the offset, skip padding for the last image */
+      if (i == bif_cfg->nodes_num - 1){
+        coff += img_size_no_pad[i];
+      } else {
+        coff += img_size[i];
+      }
     }
 
     /* Create image headers for all of them */
